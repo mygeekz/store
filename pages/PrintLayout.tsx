@@ -18,11 +18,13 @@ const PrintLayout: React.FC = () => {
       if (root) {
         const text = (root.innerText || '').replace(/\s+/g, ' ').trim();
         const hasLoadingText = /بارگذاری|در حال|loading|please wait/i.test(text);
+        const hasEmptyStateText = /گزارش برای نمایش آماده نیست|موردی برای نمایش وجود ندارد|گزارش پیدا نشد/i.test(text);
         const rowCount = root.querySelectorAll('table tbody tr').length;
         const hasMeaningfulDom = root.querySelectorAll('*').length > 10;
+        const hasCards = root.querySelectorAll('.kpi-card,.card,.panel,[data-report-card="true"]').length > 0;
 
         // اگر جدول دارد یا متن کافی دارد و پیام loading دیده نمی‌شود، آماده است.
-        if (!hasLoadingText && (rowCount > 0 || text.length > 60) && hasMeaningfulDom) {
+        if (!hasLoadingText && !hasEmptyStateText && (rowCount > 0 || hasCards || text.length > 140) && hasMeaningfulDom) {
           // دو فریم صبر کن تا layout نهایی شود
           await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
           await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -78,12 +80,47 @@ const PrintLayout: React.FC = () => {
       <style>{`
         @media print {
           html, body { background: #fff !important; }
-          /* مخفی کردن کنترل‌ها در چاپ */
-          button, input, select, textarea, .no-print, [data-print-hide="true"] { display: none !important; }
-          /* خنثی کردن transform که در Chrome باعث سفید شدن/کات می‌شود */
-          * { transform: none !important; filter: none !important; }
-          /* اسکرول‌ها را باز کن تا محتوا کامل چاپ شود */
-          * { overflow: visible !important; max-height: none !important; }
+
+          /*
+            مشکل «برگه سفید»:
+            در بعضی گزارش‌ها، پورتال‌ها/overlayها (مثل DatePicker/Modal) روی کل صفحه می‌افتند
+            و در چاپ روی محتوا می‌نشینند. اینجا فقط #report-print-root را قابل مشاهده می‌کنیم.
+          */
+          body * {
+            visibility: hidden !important;
+          }
+
+          #report-print-root,
+          #report-print-root * {
+            visibility: visible !important;
+          }
+
+          #report-print-root {
+            position: absolute !important;
+            inset: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+          }
+
+          /* مخفی کردن کنترل‌های تعاملی داخل خود گزارش */
+          #report-print-root button,
+          #report-print-root input,
+          #report-print-root select,
+          #report-print-root textarea,
+          #report-print-root .no-print,
+          #report-print-root [data-print-hide="true"] {
+            display: none !important;
+          }
+
+          /* خوانایی */
+          #report-print-root,
+          #report-print-root * {
+            color: #111827 !important;
+            text-shadow: none !important;
+            filter: none !important;
+          }
         }
       `}</style>
 
