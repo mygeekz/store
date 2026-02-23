@@ -6,7 +6,6 @@ import TelegramTopicPanel from '../components/TelegramTopicPanel';
 import ReportSchedulePanel from '../components/ReportSchedulePanel';
 import { exportReportToXlsx } from '../utils/reportXlsx';
 // پرینت مستقیم بدون route چاپ
-import { printArea } from '../utils/printArea';
 // استفاده از helper برای چاپ مستقیم بدون رفتن به مسیر /print (پیشگیری از صفحه سفید)
 import { openReportPrintWindow } from '../utils/reportPrint';
 import { useAuth } from '../contexts/AuthContext';
@@ -230,16 +229,21 @@ const ReportsLayout: React.FC = () => {
   // ✅ روش پایدار: چاپ/PDF از مسیر جدا (Print Route)
   // این کار باعث می‌شود MainLayout/overflow/transform در چاپ دخالت نکنند و خروجی سفید نشود.
   const openPrintRoute = (mode: 'pdf' | 'print') => {
-    if (isHub) return;
+    if (isHub) return false;
 
-    // HashRouter: مسیر فعلی داخل location.hash است.
+    // برای سازگاری با BrowserRouter و HashRouter
     const hash = window.location.hash || '';
-    const raw = hash.startsWith('#') ? hash.slice(1) : hash;
-    const [pathOnly, searchOnly = ''] = raw.split('?');
-    if (!pathOnly.startsWith('/reports')) return;
+    const hashRaw = hash.startsWith('#') ? hash.slice(1) : hash;
+    const [hashPath = '', hashSearch = ''] = hashRaw.split('?');
 
-    const printPath = pathOnly.replace('/reports', '/print/reports');
-    const qs = new URLSearchParams(searchOnly);
+    const currentPath = hashPath.startsWith('/reports') ? hashPath : pathname;
+    if (!currentPath.startsWith('/reports')) return false;
+
+    const printPath = currentPath.replace('/reports', '/print/reports');
+
+    // اگر hash-based بود، query از hash می‌آید؛ در غیر اینصورت از location.search
+    const baseSearch = hashPath.startsWith('/reports') ? hashSearch : (window.location.search || '').replace(/^\?/, '');
+    const qs = new URLSearchParams(baseSearch);
     qs.set('mode', mode);
 
     // برای auto-print در تب جدید
@@ -249,8 +253,14 @@ const ReportsLayout: React.FC = () => {
       // ignore
     }
 
-    const url = `${window.location.origin}${window.location.pathname}#${printPath}?${qs.toString()}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    const isHashRouting = hashPath.startsWith('/');
+    const base = `${window.location.origin}${window.location.pathname}`;
+    const url = isHashRouting
+      ? `${base}#${printPath}?${qs.toString()}`
+      : `${window.location.origin}${printPath}?${qs.toString()}`;
+
+    const win = window.open(url, '_blank', 'noopener,noreferrer');
+    return Boolean(win);
   };
 
   const doExportPdf = async () => {
@@ -264,8 +274,12 @@ const ReportsLayout: React.FC = () => {
       }
       return;
     }
-    // Fallback: از محتوی فعلی گزارش snapshot بگیر و در پنجره جدید چاپ کن.
-    // این روش از Transform/Overflow layout اصلی جداست و جلوی صفحه سفید را می‌گیرد.
+
+    // اولویت با route اختصاصی چاپ/PDF گزارش‌ها
+    const opened = openPrintRoute('pdf');
+    if (opened) return;
+
+    // Fallback: snapshot از محتوای فعلی
     try {
       openReportPrintWindow({
         title: meta.title,
@@ -274,29 +288,7 @@ const ReportsLayout: React.FC = () => {
         rtl: true,
       });
     } catch {
-      // اگر پنجره پاپ‌آپ مسدود شد، حداقل چاپ معمولی را امتحان کن
       window.print();
-    }
-  };
-
-  // Wait until report is loaded before printing. Similar to PrintLayout's waitForReportReady.
-  const waitForReportReady = async (timeoutMs = 12000) => {
-    const start = Date.now();
-    const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-    while (Date.now() - start < timeoutMs) {
-      const root = document.getElementById('report-print-root') as HTMLElement | null;
-      if (root) {
-        const text = (root.innerText || '').replace(/\s+/g, ' ').trim();
-        const hasLoadingText = /بارگذاری|در حال|loading|please wait/i.test(text);
-        const rowCount = root.querySelectorAll('table tbody tr').length;
-        const hasMeaningfulDom = root.querySelectorAll('*').length > 10;
-        if (!hasLoadingText && (rowCount > 0 || text.length > 60) && hasMeaningfulDom) {
-          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-          return;
-        }
-      }
-      await sleep(250);
     }
   };
 
@@ -305,16 +297,22 @@ const ReportsLayout: React.FC = () => {
       await exportHandlers.print();
       return;
     }
-    // صبر کنید تا دیتای گزارش لود شود (جدول/آمار)
-    await waitForReportReady();
-    // CSS اضافی: حذف transform/overflow در چاپ و پنهان کردن دکمه‌ها
-    const extraCss = `
-      @media print {
-        * { transform: none !important; overflow: visible !important; filter: none !important; }
-        button, .no-print, [data-print-hide="true"] { display: none !important; }
-      }
-    `;
-    printArea('#report-print-root', { title: meta.title, extraCss });
+
+    // اولویت با route اختصاصی چاپ گزارش‌ها
+    const opened = openPrintRoute('print');
+    if (opened) return;
+
+    // fallback برای مواقع خاص (popup blocked / route mismatch)
+    try {
+      openReportPrintWindow({
+        title: meta.title,
+        selector: '#report-print-root',
+        mode: 'print',
+        rtl: true,
+      });
+    } catch {
+      window.print();
+    }
   };
 
   const doExportXlsx = async () => {
