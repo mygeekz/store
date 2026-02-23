@@ -1,0 +1,71 @@
+  return (
+    <PageKit
+      title="مشتریان"
+      subtitle="مدیریت مشتریان و پرونده هر فرد، با جستجو و خروجی."
+      icon={<i className="fa-solid fa-user-group" />}
+      query={searchTerm}
+      onQueryChange={setSearchTerm}
+      searchPlaceholder="جستجو بر اساس نام یا شماره تماس..."
+      isLoading={isLoading}
+      isEmpty={!isLoading && filteredCustomers.length === 0}
+      emptyTitle={customers.length === 0 && !searchTerm ? 'هنوز هیچ مشتری ثبت نشده' : 'موردی پیدا نشد'}
+      emptyDescription={
+        customers.length === 0 && !searchTerm
+          ? 'برای شروع، اولین مشتری را اضافه کنید تا گزارش‌ها و فروش هم کامل شوند.'
+          : searchTerm
+            ? 'جستجوی شما با هیچ مشتری‌ای مطابقت نداشت.'
+            : 'فیلترها را تغییر بده یا پاک کن.'
+      }
+      emptyActionLabel={
+        customers.length === 0 && !searchTerm
+          ? 'افزودن مشتری'
+          : searchTerm
+            ? 'پاک کردن جستجو'
+            : undefined
+      }
+      onEmptyAction={() => {
+        if (customers.length === 0 && !searchTerm) setIsAddModalOpen(true);
+        else if (searchTerm) setSearchTerm('');
+      }}
+      toolbarRight={
+        <>
+          <ExportMenu
+            className="shrink-0"
+            items={[
+              { key: 'excel', label: 'Excel (XLSX)', icon: 'fa-file-excel', onClick: doExportExcel, disabled: filteredCustomers.length === 0 },
+              { key: 'pdf', label: 'PDF (جدول)', icon: 'fa-file-pdf', onClick: doExportPdf, disabled: filteredCustomers.length === 0 },
+              { key: 'print', label: 'چاپ لیست', icon: 'fa-print', onClick: () => printArea('#customers-print-area', { title: 'لیست مشتریان' }), disabled: filteredCustomers.length === 0 },
+            ]}
+          />
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="h-10 px-4 rounded-lg bg-primary-600 text-white font-medium hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary/30 transition-colors whitespace-nowrap"
+          >
+            <i className="fas fa-user-plus ml-2"></i>
+            افزودن مشتری
+          </button>
+        </>
+      }
+      secondaryRow={
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <HubCard
+            title="مشتریان"
+            subtitle="مدیریت مشتریان و پرونده هر فرد"
+            icon="fa-solid fa-user-group"
+            gradientFrom="from-violet-500"
+            gradientTo="to-purple-600"
+            to="/customers"
+            active={location.pathname === '/customers' || location.pathname.startsWith('/customers/')}
+          />
+          <HubCard
+            title="همکاران"
+            subtitle="تامین‌کنندگان، تکنسین‌ها و..."
+            icon="fa-solid fa-building"
+            gradientFrom="from-slate-500"
+            gradientTo="to-gray-700"
+            to="/partners"
+            active={location.pathname.startsWith('/partners')}
+          />
+        </div>
+      }
+    >
